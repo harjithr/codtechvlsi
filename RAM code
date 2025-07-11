@@ -1,0 +1,17 @@
+module SyncRAM (
+    input clk,
+    input we,                    // Write Enable
+    input [3:0] addr,            // 4-bit Address: 16 locations
+    input [7:0] din,             // Data input
+    output reg [7:0] dout        // Data output
+);
+
+    reg [7:0] mem [15:0];        // 16x8 RAM
+
+    always @(posedge clk) begin
+        if (we)
+            mem[addr] <= din;    // Write operation
+        dout <= mem[addr];       // Read (synchronous)
+    end
+
+endmodule
