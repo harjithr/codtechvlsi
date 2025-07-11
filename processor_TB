@@ -1,0 +1,30 @@
+`timescale 1ns / 1ps
+
+module processor_tb;
+
+    reg clk = 0;
+
+    wire [7:0] debug_pc;
+    wire [15:0] debug_instr_if;
+    wire [15:0] debug_instr_id;
+    wire [7:0] debug_alu_result;
+    wire [7:0] debug_wb_data;
+    wire [3:0] debug_wb_dest;
+
+    processor uut (
+        .clk(clk),
+        .debug_pc(debug_pc),
+        .debug_instr_if(debug_instr_if),
+        .debug_instr_id(debug_instr_id),
+        .debug_alu_result(debug_alu_result),
+        .debug_wb_data(debug_wb_data),
+        .debug_wb_dest(debug_wb_dest)
+    );
+
+    always #5 clk = ~clk; // 10ns clock
+
+    initial begin
+        #100 $finish;
+    end
+
+endmodule
