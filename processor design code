@@ -1,0 +1,121 @@
+//PROCESSOR MODULE 
+
+module processor (
+    input clk,
+    output [7:0] debug_pc,
+    output [15:0] debug_instr_if,
+    output [15:0] debug_instr_id,
+    output [7:0] debug_alu_result,
+    output [7:0] debug_wb_data,
+    output [3:0] debug_wb_dest
+);
+    reg [7:0] pc = 0;
+
+    // IF Stage
+    wire [15:0] instr_if;
+    instruction_memory imem(.pc(pc), .instruction(instr_if));
+
+    // ID Stage
+    reg [15:0] instr_id;
+    reg [7:0]  rd1_id, rd2_id;
+
+    // EX Stage
+    reg [15:0] instr_ex;
+    reg [7:0] alu_result;
+    reg [3:0] dest_ex;
+
+    // WB Stage
+    reg [7:0] wb_data;
+    reg [3:0] wb_dest;
+    reg we_rf;
+
+    // Register File
+    wire [7:0] rd1_rf, rd2_rf;
+    register_file rf(
+        .clk(clk),
+        .we(we_rf),
+        .ra1(instr_id[11:8]),
+        .ra2(instr_id[7:4]),
+        .wa(wb_dest),
+        .wd(wb_data),
+        .rd1(rd1_rf),
+        .rd2(rd2_rf)
+    );
+
+    // Simple Data Memory for LOAD
+    reg [7:0] data_mem [0:255];
+    initial begin
+        data_mem[3] = 8'hAB;
+    end
+
+    always @(posedge clk) begin
+        // Pipeline: IF -> ID
+        instr_id <= instr_if;
+        rd1_id <= rd1_rf;
+        rd2_id <= rd2_rf;
+
+        // ID -> EX
+        instr_ex <= instr_id;
+
+        case (instr_id[15:12])
+            4'b0000: alu_result <= rd1_rf + rd2_rf; // ADD
+            4'b0001: alu_result <= rd1_rf - rd2_rf; // SUB
+            4'b0010: alu_result <= data_mem[instr_id[7:0]]; // LOAD
+            default: alu_result <= 0;
+        endcase
+
+        // EX -> WB
+        wb_data <= alu_result;
+        wb_dest <= instr_ex[11:8];
+        we_rf <= 1;
+
+        // PC increment
+        pc <= pc + 1;
+    end
+
+    // Debug Outputs for Waveform
+    assign debug_pc         = pc;
+    assign debug_instr_if   = instr_if;
+    assign debug_instr_id   = instr_id;
+    assign debug_alu_result = alu_result;
+    assign debug_wb_data    = wb_data;
+    assign debug_wb_dest    = wb_dest;
+endmodule
+
+//INSTRUCTION MEMORY MODULE
+
+module instruction_memory (
+    input [7:0] pc,
+    output reg [15:0] instruction
+);
+    reg [15:0] mem [0:255];
+
+    initial begin
+        // Format: [opcode][rd][rs1][rs2 or addr]
+        mem[0] = 16'b0000_0001_0010_0011; // ADD R1 = R2 + R3
+        mem[1] = 16'b0001_0100_0001_0010; // SUB R4 = R1 - R2
+        mem[2] = 16'b0010_0101_00000011;  // LOAD R5 = MEM[3]
+        mem[3] = 16'b0000_0110_0001_0100; // ADD R6 = R1 + R4
+    end
+
+    always @(*) instruction = mem[pc];
+endmodule
+
+//REGISTER MODULE
+
+module register_file (
+    input clk,
+    input we,
+    input [3:0] ra1, ra2, wa,
+    input [7:0] wd,
+    output [7:0] rd1, rd2
+);
+    reg [7:0] regs[15:0];
+
+    assign rd1 = regs[ra1];
+    assign rd2 = regs[ra2];
+
+    always @(posedge clk)
+        if (we)
+            regs[wa] <= wd;
+endmodule
